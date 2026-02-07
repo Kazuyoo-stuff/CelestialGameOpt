@@ -1,4 +1,4 @@
-# Celestial Game Opt 🚀
+# ⚡ Celestial Game Opt
 
 **Celestial Game Opt** is an adaptive, low-overhead runtime optimization framework designed to enhance Android game performance while preserving system stability and responsiveness.
 
