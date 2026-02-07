@@ -41,39 +41,7 @@ This ensures performance gains without compromising thermal balance or UI smooth
 ---
 
 ## 🔁 Adaptive Optimization Flow
-CelestialGameOpt Logic
-├── Script Start / Trigger
-│   ├── Boot / Manual / WebUI
-│   └── Mode Detection (Normal / Performance)
-│
-├── Safe Priority Setup
-│   ├── nice / uclamp / taskset
-│   └── Safe baseline preparation
-│
-├── Environment Detection
-│   ├── Device & Kernel info
-│   ├── Active App / Game List
-│   └── FPS / Refresh Rate
-│
-├── Runtime Telemetry
-│   ├── CPU load
-│   ├── RAM usage
-│   └── FPS / Render state
-│
-├── Adaptive Decision Engine ──▶ Optimization Apply
-│   ├── Condition evaluation          ├── Render optimization
-│   ├── Lightweight adaptive logic    ├── Memory tuning
-│   └── Optimization selection        └── CPU scheduling
-│
-├── Monitoring Loop
-│   ├── Low overhead runtime check
-│   ├── Re-evaluate on change
-│   └── Prevent redundant apply
-│
-└── Restore Safe Baseline
-    ├── Revert temporary tweaks
-    ├── Cleanup state
-    └── Minimal logging
+![Celestial Logic Flow](https://raw.githubusercontent.com/Kazuyoo-stuff/CelestialGameOpt/main/docs/logic_flow.png)
 
 ---
 
