@@ -1,4 +1,3 @@
-**⚡ Celestial Game Opt**
 ![Celestial Logic Flow](https://raw.githubusercontent.com/Kazuyoo-stuff/CelestialGameOpt/main/docs/logic_flow.png)
 
 **Celestial Game Opt** is an adaptive, low-overhead runtime optimization framework designed to enhance Android game performance while preserving system stability and responsiveness.
