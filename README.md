@@ -55,6 +55,11 @@ This ensures performance gains without compromising thermal balance or UI smooth
 | Minimal log / spam | ✅ Yes | ❌ Often noisy |
 | Hardware-agnostic logic | ✅ Yes | ❌ Device-specific |
 
-Celestial focuses on **balance**, not brute force.
+---
+
+🧾 Conclusion
+Celestial Game Opt is a lightweight, adaptive runtime optimization framework that enhances Android gaming performance by reacting to real-time system conditions instead of applying static or aggressive tweaks.
+Through low-priority execution, continuous telemetry evaluation, and safe state restoration, Celestial improves frame stability and responsiveness while preserving system balance, thermal safety, and UI smoothness.
+Engineered for efficiency, not force..
 
 ---
