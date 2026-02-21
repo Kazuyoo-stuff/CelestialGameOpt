@@ -52,6 +52,15 @@ This ensures performance gains without compromising thermal balance or UI smooth
 
 ---
 
+# ☕ Support Manager?
+- KernelSU
+- Magisk
+- Apatch?
+- Kitsune?
+- AxManager (Tools No Root)
+  
+---
+
 # 🧾 Conclusion
 Celestial Game Opt is a lightweight, adaptive runtime optimization framework that enhances Android gaming performance by reacting to real-time system conditions instead of applying static or aggressive tweaks.
 
