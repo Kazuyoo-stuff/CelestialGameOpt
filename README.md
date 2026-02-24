@@ -58,7 +58,17 @@ This ensures performance gains without compromising thermal balance or UI smooth
 - Apatch?
 - Kitsune?
 - AxManager (Tools No Root)
-  
+
+---
+
+# ✨ Credits
+big thanks for all contribute KSU-Next | UI Inspiration
+AxManager(FahrezONE) | UI Inspiration
+Gemini AI | ChatGPT | DeepSeek | Helper
+@RiProG (telegram) | WebUI Inspiration
+@HoyoSlave (telegram) | Cmd added
+@reljawa (telegram) | Helper
+
 ---
 
 # 🧾 Conclusion
