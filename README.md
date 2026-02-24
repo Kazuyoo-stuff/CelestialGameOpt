@@ -62,12 +62,13 @@ This ensures performance gains without compromising thermal balance or UI smooth
 ---
 
 # ✨ Credits
-big thanks for all contribute KSU-Next | UI Inspiration
-AxManager(FahrezONE) | UI Inspiration
-Gemini AI | ChatGPT | DeepSeek | Helper
-@RiProG (telegram) | WebUI Inspiration
-@HoyoSlave (telegram) | Cmd added
-@reljawa (telegram) | Helper
+- Gemini AI | ChatGPT | DeepSeek | Helper Logic & cooding
+- KSU-Next | UI Inspiration
+- AxManager(FahrezONE) | UI Inspiration
+- @RiProG (telegram) | WebUI Inspiration
+- @HoyoSlave (telegram) | Cmd added
+- @reljawa (telegram) | Helper
+- big thanks for all contribute
 
 ---
 
