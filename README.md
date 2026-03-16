@@ -1,82 +1,68 @@
 ![Celestial Logic Flow](https://raw.githubusercontent.com/Kazuyoo-stuff/CelestialGameOpt/main/docs/logic_flow.png)
 
-**Celestial Game Opt** is an adaptive, low-overhead runtime optimization framework designed to enhance Android game performance while preserving system stability and responsiveness.
+# Celestial Game Opt
 
-Unlike traditional performance tweaks that rely on static parameters or aggressive forcing, Celestial operates through a **lightweight adaptive loop**, reacting to real-time system conditions such as CPU load, memory availability, and frame pacing.
-
----
-
-## ✨ Key Philosophy
-
-Celestial is built on four core principles:
-
-- **Adaptive, not aggressive**  
-  Optimizations are applied dynamically based on real device state.
-
-- **Low priority, minimal overhead**  
-  Runs with reduced scheduler and I/O priority to avoid interfering with gameplay.
-
-- **Runtime-aware logic**  
-  Continuously observes system metrics instead of applying one-time tweaks.
-
-- **Safe restoration**  
-  Automatically restores baseline behavior when games exit or the system is idle.
+A runtime game optimization module for rooted Android devices. Detects when a game is running, applies targeted system tweaks, and restores defaults when you exit.
 
 ---
 
-## 🧠 Core Logic Overview
+## How It Works
 
-Celestial follows a structured decision flow:
+The core daemon polls the foreground app every 5 seconds. When a game from your list is detected, optimizations are applied. When you leave, everything reverts automatically.
 
-1. Initialize in a safe, low-impact execution state  
-2. Detect environment (Android version, display FPS, active games)  
-3. Collect runtime telemetry (CPU, RAM, FPS stability)  
-4. Decide optimal actions based on current conditions  
-5. Apply lightweight optimizations  
-6. Monitor continuously in a low-overhead loop  
-7. Restore safe defaults when no longer needed  
+```
+Boot → service.sh → kazuyoo --execute
+         ↓
+    Loop every 5s
+         ↓
+    Foreground app = game?
+    ├── Yes → apply optimizations
+    └── No  → revert to baseline
+```
 
-This ensures performance gains without compromising thermal balance or UI smoothness.
-
----
-
-## 🧩 What Makes Celestial Different?
-
-| Feature | Celestial Game Opt | Typical Game Tweaks |
-|------|------------------|-------------------|
-| Runtime adaptive loop | ✅ Yes | ❌ No |
-| Low-priority execution | ✅ Yes | ❌ No |
-| Dynamic restore mechanism | ✅ Yes | ❌ No |
-| Minimal log / spam | ✅ Yes | ❌ Often noisy |
-| Hardware-agnostic logic | ✅ Yes | ❌ Device-specific |
+The daemon runs at **nice 19, ionice idle** — never competing with your game for resources.
 
 ---
 
-# ☕ Support Manager?
-- KernelSU
-- Magisk
-- Apatch?
-- Kitsune?
-- AxManager (Tools No Root)
+## What Gets Applied
+
+- CPU governor set to `performance`, game threads profiled with top-app cpuset and realtime scheduler
+- Fixed performance mode, adaptive power saver disabled, thermal unrestricted
+- Hardware EGL and HWUI memory policy set aggressive
+- Game Mode API (Android 12+): mode 2, UFW boost, I/O feature, loading boost
+- OEM-specific flags for MediaTek, Qualcomm, and Unisoc
+- All settings reverted automatically when game exits
 
 ---
 
-# ✨ Credits
-- Gemini AI | ChatGPT | DeepSeek | Helper Logic & cooding
-- KSU-Next | UI Inspiration
-- AxManager(FahrezONE) | UI Inspiration
-- @RiProG (telegram) | WebUI Inspiration
-- @HoyoSlave (telegram) | Cmd added
-- @reljawa (telegram) | Helper
-- big thanks for all contribute
+## WebUI
+
+Accessible via KernelSU/APatch/Ax manager.
+
+- **Game tab** — gamelist management, per-game compile mode, DND toggle
+- **Utility Tool** — refresh rate, composition type, game driver, GMS doze, network adjuster, logging
+- **Cleaning** — RAM compaction and cache clear
+- **Downscaling** — render scale via Game Mode API
+- **DNS Private** — private DNS provider
+- **Other tweaking** — improvement for android
 
 ---
 
-# 🧾 Conclusion
-Celestial Game Opt is a lightweight, adaptive runtime optimization framework that enhances Android gaming performance by reacting to real-time system conditions instead of applying static or aggressive tweaks.
+## Requirements
 
-Through low-priority execution, continuous telemetry evaluation, and safe state restoration, Celestial improves frame stability and responsiveness while preserving system balance, and UI smoothness.
-
-Engineered for efficiency, not force..
+- Support Android 9+
+- Android 12+ recommended
+- Magisk / KernelSU / APatch / AxManager
 
 ---
+
+## Credits
+
+- KSUN & AxManager for reference UI
+`@AduhaiWelewele` · `@notzeetaa` · `@HoyoSlave` · `@LeanHijosdesusMadres` · `@Bias_khaliq` · `@Dcx400` · `@RiProG` · Matt Yang
+
+---
+
+## License
+
+GPL-3.0 — see [LICENSE](LICENSE)
