@@ -1,7 +1,6 @@
 # Changelog
 
 ## [v2.9]
-**v2.9 Changelog**
 
 - Fixed restore session — composition & renderer re-applied after reboot.
 - Fixed gamelist disappearing after reboot with persistent backup to `/data/adb/`.
