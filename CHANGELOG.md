@@ -1,19 +1,15 @@
 # Changelog
 
-## [v2.9]
+## [v3.0]
 
-- Fixed restore session — composition & renderer re-applied after reboot.
-- Fixed gamelist disappearing after reboot with persistent backup to `/data/adb/`.
-- Fixed duplicate `.section-title` CSS causing margin issues.
-- Fixed scroll lag in WebUI by removing slideUp animation and adding GPU compositing hints.
-- Fixed overflow reset bug in closeSubPage and closeDownloadDialog.
-- Fixed `$gms` variable bug in uninstall.sh GMS doze loop.
-- Fixed missing `rm -f /data/adb/kazuyoo_gamelist.txt` in uninstall.sh.
-- Removed redundant `bindBtn` and `bindSw` calls for non-existent DOM elements.
-- Added Job Scheduler Limit toggle in cleaning menu.
-- Added GMS Doze warning dialog before enabling.
-- Added Game Preload status popup.
-- Added UNISOC-specific game props — frameboost, pwctl, ylog, aegean mem compact.
-- Added daily smooth props for pwctl in service.sh.
-- Redesigned about page with horizontal layout and MD3 list style credits.
-- Improved WebUI restore session logic with skipKeys and persistKeys separation.
+**Changelog**
+
+- Separated `game_profiles_server` into standalone `game_profiles` binary for cleaner daemon management
+- Fixed daemon not starting — replaced broken `setsid sh -c '...'` with direct `refresh_loop >> log &`
+- Fixed gamelist path mismatch — `TEMP_FILE` in script.js now points to `/data/local/tmp/gamelist.txt` consistent with GAP
+- Added `game_profiles` to `customize.sh` extract and `chmod +x`
+- Fixed settings put commands wrapped in background subshell to avoid blocking main loop
+- Fixed `mode` variable not resetting after game exit causing duplicate triggers
+- Remove root parameter or tweak for root in service.sh section (because I doubt if it will be stable)
+- Optimized pid checking (now more thorough)
+- more optimizations 
