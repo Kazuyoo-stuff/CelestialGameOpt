@@ -1,34 +1,37 @@
 # Changelog
 
-## [v3.1]
+## [v3.2]
 
-- Added Battery Saver toggle button on status card (home page)
-- Fixed Battery Saver toggle not executing command when clicked before opening Utility Tool page
-- Fixed Battery Saver toggle showing as active on first install
-- Fixed localStorage not resetting on module reinstall — now uses layered detection: reset flag → module version check → first install fallback
-- Removed redundant `saverToggle` handler from `openSettingsPage` to prevent listener conflict
-- Added `setDefaultStates()` helper to centralize default state initialization
-- Added Reload Server button on Logging page with live service status indicator
-- Fixed `_module_ver` added to `SKIP_RESTORE_KEYS` to prevent version key from being restored as a toggle
-- Added `saver` mode
-- Fixed `--execute` daemon not surviving after KSU shell exit — replaced `trap "" HUP` subshell with `setsid` for proper session detachment
-- Fixed `disown` error on Android sh — removed since `setsid` alone is sufficient for daemonization
-- Fixed PID detection race condition in `--execute` — added `sleep 2` before pgrep to allow `game_profiles_server` to exec into `cgo_engine`
-- Simplified `--execute` to follow consistent PID file pattern using `kill -0` check
-- Changed daemon PID detection from `pgrep -f` to `pgrep -x cgo_engine` for exact process name match
-- Added `taskset`, `renice`, `ionice` to `--execute` for consistent process priority handling
-
----
-
-**WebUI v3.0.1**
-
-- Refactored service status checking into a single shared `checkServiceRunning()` utility, eliminating duplicated logic across functions
-- `updateServiceStatus()` now calls `checkServiceRunning()` directly instead of reimplementing its own process detection
-- Fixed `reloadServer()` UI getting stuck in "Restarting..." state by properly detaching `cgo_engine` with `</dev/null >/dev/null 2>&1 &`, preventing the shell from blocking on stdout
-- Added dedicated **Service Manager** page under Settings → Service, separated from Logging
-- Removed service status section from Logging template; Logging page now shows log viewer only
-- Service Manager page features MD3-styled status card with glowing dot indicator, process info list, restart button, and inline note
-- Status card icon on home page now dynamically updates between a **play icon** (running) and **info icon** (not running) with matching color, replacing the static warning triangle
-- Both running and not-running states on the home status card now use identical visual treatment — same icon shape, same card style, color is the only difference (green vs red)
-- `initServerStatus()` replaces the old `initLogServiceStatus()`, using new element IDs scoped to the server template
-- `reloadServer()` now syncs the home page card via `updateServiceStatus()` at the end instead of duplicating state updates
+- Refactored `game_profiles_server` into modular functions — `enter_game_mode`, `exit_game_mode`, `apply_task_profile`, `apply_settings_on`, `apply_settings_off`, `apply_soc_on`, `apply_soc_off`, `notify`, `is_screen_on`, `get_fg_pkg` each with single responsibility
+- Moved SOC detection (`MTK`/`QCOM`) outside the daemon loop — detected once at startup, not re-evaluated every iteration
+- Added separate idle and gaming poll intervals — `IDLE_INTERVAL=10s` when no game running, `POLL_INTERVAL=5s` when game active, reducing CPU overhead and battery drain during idle
+- Fixed battery drain after game exit — `power_mode middle` corrected to `power_mode normal` in `apply_settings_off`
+- Fixed `--stop` case — replaced `pkill -f cgo_engine` with `kill -9 $(cat $SVC_PID_FILE)` + `rm -f $SVC_PID_FILE`
+- Added Transsion `gamecube` and `game_*` settings to `apply_settings_on` — `game_do_not_disturb`, `gamecube_competition_mode_state`, `gamecube_competition_system_state`, `gamecube_block_notification_state`, `gamecube_refused_call_state`, `gamecube_lock_screen_brightness_state`, `gamecube_shorten_nav_bar_key_state`, `game_scene_more_fps`, `gamecube_shield_screen_capture_state`
+- Added `gamecube` and `game_*` revert in `apply_settings_off` — all toggled settings restored to default values on game exit
+- Added `device_config override` block in `final_optimize_gpu` — `core_graphics` SurfaceFlinger flags, `art_performance` ART compiler flags, and `game` ADPF flags
+- Added ADPF overrides — `adpf_gpu_report_actual_work_duration=true`, `adpf_gpu_sf=true`, `adpf_hwui_gpu=false`, `adpf_prefer_power_efficiency=false`
+- Added `core_graphics` overrides — `latch_unsignaled_with_auto_refresh_changed=false`, `use_known_refresh_rate_for_fps_consistency=true`, `cache_when_source_crop_layer_only_moved=true`, `commit_not_composited=true`, `add_sf_skipped_frames_to_trace=false`
+- Added `art_performance` overrides — `fast_baseline_compiler=true`, `reg_alloc_spill_slot_reuse=true`, `use_app_image_startup_cache=true`
+- Fixed WebUI `checkServiceRunning` — was incorrectly reading `svc_server.log` instead of `svc_server.pid`
+- Fixed WebUI `reloadServer` — binary reference corrected from `cgo_engine` to `game_profiles`
+- Upgraded WebUI PID detection to three-layer check — PID file → `pgrep` → `/proc` cmdline scan fallback for both GAP and `game_profiles` service
+- Fixed WebUI `writeGameList` — now uses atomic tmpfile + `mv` to prevent race condition on concurrent writes
+- Centralized `readGameList` as single reusable function — eliminates duplicated parsing logic across toggle, add, remove operations
+- Fixed WebUI `restoreSession` — `job_scheduler_limit` and `storage_pressure` now restored via dedicated handlers instead of generic `safeExecScript` on reboot
+- Added `visibilitychange` listener to system stats monitor — pauses update cycle when WebUI tab is hidden to reduce background overhead
+- Extracted `applyJobSchedulerLimit` and `applyStoragePressure` as standalone async functions — reused in both toggle handlers and session restore
+- Fixed `restoreSession()` in script.js silently skipping every on/off tweak (job scheduler, storage pressure, GMS doze, disable logging, sensor disable, network adjuster, saver, ram compact) after a reboot due to a `PERSIST_KEYS` set that excluded them from being re-applied
+- Added dedicated `applyJobSchedulerLimit()` and `applyStoragePressure()` helpers so both the UI toggle handlers and `restoreSession()` share the same logic instead of duplicating it
+- Fixed reboot restore for `composition`/`renderer`/`refresh`/`driver`/`dns_private` to correctly re-exec only when their value isn't `off`/`Default`
+- Fixed `build_game_list()` in script.sh overwriting `gamelist.txt` from scratch on every boot, which wiped user-managed enable/disable state and custom entries added via the WebUI
+- Changed `build_game_list()` to merge: use `/data/adb/kazuyoo_gamelist.txt` as the base when it exists, and only append newly detected games not already present (enabled or disabled), falling back to a full scan only on first install
+- Fixed nested single-quote corruption inside `sh -c '...'` wrappers in `gms_doze` (on/off) and `saver on` in the kazuyoo dispatcher, which silently broke/truncated those background commands
+- Fixed `saver on` referencing `$GAMELIST_FILE` and `$DS_VAL` inside a child shell without exporting them (and `$DS_VAL` was never even set in that branch), causing the game-overlay reset loop to always no-op
+- Changed `gms_doze` and `saver on` to write their logic to temp script files via heredoc and execute those, avoiding nested-quote issues entirely
+- Fixed `saver off` writing the engine PID to `svc_server.log` instead of `svc_server.pid`, which is what `checkServiceRunning()`/`reloadServer()` in the WebUI actually read
+- Fixed nested single-quote corruption in uninstall.sh's reset block (`grep -oE`, `sed 's/...'`, `tr -d ' '` inside the outer `sh -c '...'`), where an unquoted space from the broken nesting truncated the command before the GMS netpolicy restore loop and driver-settings cleanup loop ever ran
+- Fixed duplicated `for X in for X in $(...)` loops (game list reset loop and GMS package loop) in uninstall.sh
+- Changed uninstall.sh's reset block to run from a temp script file via heredoc instead of an inline `sh -c '...'` one-liner
+- Flagged `$AXERONXBIN` in uninstall.sh as referenced but never defined/exported, risking `rm -f /kazuyoo*` at filesystem root instead of removing the actual installed binaries
+- Flagged that `/data/adb/kazuyoo_gamelist.txt` (the gamelist backup) is not removed by uninstall.sh's cleanup, so custom game entries persist across reinstall unless removed intentionally
