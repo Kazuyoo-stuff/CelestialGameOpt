@@ -26,8 +26,6 @@ The daemon runs at **nice 19, ionice idle** — never competing with your game f
 
 ## What Gets Applied
 
-- CPU governor set to `performance`, game threads profiled with top-app cpuset and realtime scheduler
-- Fixed performance mode, adaptive power saver disabled, thermal unrestricted
 - Hardware EGL and HWUI memory policy set aggressive
 - Game Mode API (Android 12+): mode 2, UFW boost, I/O feature, loading boost
 - OEM-specific flags for MediaTek, Qualcomm, and Unisoc
