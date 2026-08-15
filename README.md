@@ -26,7 +26,7 @@ The daemon runs at **nice 19, ionice idle** — never competing with your game f
 
 ## What Gets Applied
 
-- Hardware EGL and HWUI memory policy set aggressive
+- Hardware EGL and HWUI for better ui smooth
 - Game Mode API (Android 12+): mode 2, UFW boost, I/O feature, loading boost
 - OEM-specific flags for MediaTek, Qualcomm, and Unisoc
 - All settings reverted automatically when game exits
