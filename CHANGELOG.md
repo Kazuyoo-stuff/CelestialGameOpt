@@ -1,37 +1,28 @@
 # Changelog
 
-## [v3.2]
+## [v3.3]
 
-- Refactored `game_profiles_server` into modular functions — `enter_game_mode`, `exit_game_mode`, `apply_task_profile`, `apply_settings_on`, `apply_settings_off`, `apply_soc_on`, `apply_soc_off`, `notify`, `is_screen_on`, `get_fg_pkg` each with single responsibility
-- Moved SOC detection (`MTK`/`QCOM`) outside the daemon loop — detected once at startup, not re-evaluated every iteration
-- Added separate idle and gaming poll intervals — `IDLE_INTERVAL=10s` when no game running, `POLL_INTERVAL=5s` when game active, reducing CPU overhead and battery drain during idle
-- Fixed battery drain after game exit — `power_mode middle` corrected to `power_mode normal` in `apply_settings_off`
-- Fixed `--stop` case — replaced `pkill -f cgo_engine` with `kill -9 $(cat $SVC_PID_FILE)` + `rm -f $SVC_PID_FILE`
-- Added Transsion `gamecube` and `game_*` settings to `apply_settings_on` — `game_do_not_disturb`, `gamecube_competition_mode_state`, `gamecube_competition_system_state`, `gamecube_block_notification_state`, `gamecube_refused_call_state`, `gamecube_lock_screen_brightness_state`, `gamecube_shorten_nav_bar_key_state`, `game_scene_more_fps`, `gamecube_shield_screen_capture_state`
-- Added `gamecube` and `game_*` revert in `apply_settings_off` — all toggled settings restored to default values on game exit
-- Added `device_config override` block in `final_optimize_gpu` — `core_graphics` SurfaceFlinger flags, `art_performance` ART compiler flags, and `game` ADPF flags
-- Added ADPF overrides — `adpf_gpu_report_actual_work_duration=true`, `adpf_gpu_sf=true`, `adpf_hwui_gpu=false`, `adpf_prefer_power_efficiency=false`
-- Added `core_graphics` overrides — `latch_unsignaled_with_auto_refresh_changed=false`, `use_known_refresh_rate_for_fps_consistency=true`, `cache_when_source_crop_layer_only_moved=true`, `commit_not_composited=true`, `add_sf_skipped_frames_to_trace=false`
-- Added `art_performance` overrides — `fast_baseline_compiler=true`, `reg_alloc_spill_slot_reuse=true`, `use_app_image_startup_cache=true`
-- Fixed WebUI `checkServiceRunning` — was incorrectly reading `svc_server.log` instead of `svc_server.pid`
-- Fixed WebUI `reloadServer` — binary reference corrected from `cgo_engine` to `game_profiles`
-- Upgraded WebUI PID detection to three-layer check — PID file → `pgrep` → `/proc` cmdline scan fallback for both GAP and `game_profiles` service
-- Fixed WebUI `writeGameList` — now uses atomic tmpfile + `mv` to prevent race condition on concurrent writes
-- Centralized `readGameList` as single reusable function — eliminates duplicated parsing logic across toggle, add, remove operations
-- Fixed WebUI `restoreSession` — `job_scheduler_limit` and `storage_pressure` now restored via dedicated handlers instead of generic `safeExecScript` on reboot
-- Added `visibilitychange` listener to system stats monitor — pauses update cycle when WebUI tab is hidden to reduce background overhead
-- Extracted `applyJobSchedulerLimit` and `applyStoragePressure` as standalone async functions — reused in both toggle handlers and session restore
-- Fixed `restoreSession()` in script.js silently skipping every on/off tweak (job scheduler, storage pressure, GMS doze, disable logging, sensor disable, network adjuster, saver, ram compact) after a reboot due to a `PERSIST_KEYS` set that excluded them from being re-applied
-- Added dedicated `applyJobSchedulerLimit()` and `applyStoragePressure()` helpers so both the UI toggle handlers and `restoreSession()` share the same logic instead of duplicating it
-- Fixed reboot restore for `composition`/`renderer`/`refresh`/`driver`/`dns_private` to correctly re-exec only when their value isn't `off`/`Default`
-- Fixed `build_game_list()` in script.sh overwriting `gamelist.txt` from scratch on every boot, which wiped user-managed enable/disable state and custom entries added via the WebUI
-- Changed `build_game_list()` to merge: use `/data/adb/kazuyoo_gamelist.txt` as the base when it exists, and only append newly detected games not already present (enabled or disabled), falling back to a full scan only on first install
-- Fixed nested single-quote corruption inside `sh -c '...'` wrappers in `gms_doze` (on/off) and `saver on` in the kazuyoo dispatcher, which silently broke/truncated those background commands
-- Fixed `saver on` referencing `$GAMELIST_FILE` and `$DS_VAL` inside a child shell without exporting them (and `$DS_VAL` was never even set in that branch), causing the game-overlay reset loop to always no-op
-- Changed `gms_doze` and `saver on` to write their logic to temp script files via heredoc and execute those, avoiding nested-quote issues entirely
-- Fixed `saver off` writing the engine PID to `svc_server.log` instead of `svc_server.pid`, which is what `checkServiceRunning()`/`reloadServer()` in the WebUI actually read
-- Fixed nested single-quote corruption in uninstall.sh's reset block (`grep -oE`, `sed 's/...'`, `tr -d ' '` inside the outer `sh -c '...'`), where an unquoted space from the broken nesting truncated the command before the GMS netpolicy restore loop and driver-settings cleanup loop ever ran
-- Fixed duplicated `for X in for X in $(...)` loops (game list reset loop and GMS package loop) in uninstall.sh
-- Changed uninstall.sh's reset block to run from a temp script file via heredoc instead of an inline `sh -c '...'` one-liner
-- Flagged `$AXERONXBIN` in uninstall.sh as referenced but never defined/exported, risking `rm -f /kazuyoo*` at filesystem root instead of removing the actual installed binaries
-- Flagged that `/data/adb/kazuyoo_gamelist.txt` (the gamelist backup) is not removed by uninstall.sh's cleanup, so custom game entries persist across reinstall unless removed intentionally
+## Fixed
+- Fixed `uninstall.sh` killing itself mid-reset: the temp reset script's filename matched the `pkill -f "cgo_engine|kazuyoo|RC"` pattern, causing the cleanup process to terminate before finishing all `settings`/`device_config` resets.
+- Fixed `wait` being placed after `pkill` instead of before it, which made the wait ineffective once the self-kill bug triggered.
+- Fixed `debug.hwui.app_memory_policy` using invalid values (`aggressive`, `balanced`) that don't match any recognized policy string in HWUI, silently falling back to default behavior. Replaced with valid values: `default` on game enter, `lowram` on game exit.
+- Fixed `game_auto_temperature_control` being set to the same value (`0`) in both `apply_settings_on` and `apply_settings_off`, so the setting never actually toggles between game and non-game state.
+- Identified `cmd activity memory-factor set CRITICAL` during gameplay as dispatching `TRIM_MEMORY_RUNNING_CRITICAL` directly to the foreground game process (not just background apps), likely causing both slow game loading and in-session stutter. Removing the override during active gameplay.
+- Identified that `cached_apps_freezer` alone has no effect on devices where `activity_manager_native_boot/use_freezer` defaults to `false`; setting both together.
+
+## Optimized
+- `get_fg_pkg()`: removed unconditional heavy `cmd activity stack list` call on every poll tick — now only runs as a fallback when the primary detection method returns empty.
+- `get_fg_pkg()`: merged `grep | awk` into a single `awk` call with early `exit`, and fixed an unquoted glob pattern (`,0.*=t`) that could misbehave depending on working-directory contents.
+- `refresh_game_list()`: gamelist.txt is now cached and only re-parsed when its mtime changes, instead of being read from disk on every 5-second poll.
+- `apply_settings_on()` / `apply_settings_off()`: replaced 14 separate `settings list` dumps per call with a single dump per namespace (`system`/`secure`/`global`), reused in memory for all checks.
+- `build_game_list()`: replaced generic `com\.[a-zA-Z0-9._]+` extraction from `dumpsys game` with a precise `Name:` field extraction, reducing false positives from unrelated component/class names.
+- `build_game_list()`: replaced the O(n²) merge loop (double `grep -qxF` per detected package against the growing backup file) with a single-pass `grep -vFxf` diff.
+- `build_game_list()`: removed in-memory string concatenation in a `while read` loop in favor of file-based filtering.
+- Boot script `tweaks_optimization()`: preload-enable step now reads the already-built `gamelist.txt` instead of iterating every installed package and re-running `dumpsys game` on each iteration.
+- Boot script `tweaks_optimization()`: batched the "vivo opt" `settings list system` checks into a single dump, reused across all 9 checks.
+- Boot script `tweaks_optimization()`: removed a redundant `su -c` wrapper around `resetprop` in a context that already runs as root.
+- Shell-priority loop: merged `ps | grep ^shell | awk` into a single `ps | awk '$1=="shell"'`.
+- Added `wait` after the parallel `device_config delete`/`clear_override` loop in the uninstall reset script to ensure all background jobs finish before the script proceeds.
+
+## Added / UI
+- Added a "Device Config Tweaks" toggle to the Utility Tool page, wired to a new `dev_conf` case in the `kazuyoo` bin script for enabling/disabling the `device_config` override set.
