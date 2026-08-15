@@ -57,11 +57,8 @@ Accessible via KernelSU/APatch/Ax manager.
 ## Credits
 
 - KSUN & AxManager for reference UI
-- `@AduhaiWelewele` `@notzeetaa`
-- `@HoyoSlave` `@LeanHijosdesusMadres`
-- `@Bias_khaliq` `@Dcx400`
-- `@RiProG` `Matt Yang`
-
+- `@AduhaiWelewele` `@Dcx400`
+- `@HoyoSlave`
 ---
 
 ## License
