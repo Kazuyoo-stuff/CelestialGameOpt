@@ -56,9 +56,12 @@ Accessible via KernelSU/APatch/Ax manager.
 
 ## Credits
 
-- KSUN & AxManager for reference UI
-- `@AduhaiWelewele` `@Dcx400`
-- `@HoyoSlave`
+- `Gemini AI | ChatGPT | DeepSeek | Claude | Helper Logic & Cooding`
+- `KSU-Next | UI Reference`
+- `AxManager(FahrezONE) | UI Reference`
+- `@RiProG | WebUI Inspiration`
+- `@HoyoSlave | Cmd added`
+- `@reljawa | Helper`
 ---
 
 ## License
