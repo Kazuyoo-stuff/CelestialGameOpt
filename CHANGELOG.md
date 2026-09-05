@@ -10,7 +10,6 @@
 - Fixed `--stop` to report accurate status ("Service stopped." vs "Service not running.") instead of always printing "not running", and to clean up the stale PID file on success
 - Fixed a state leak where turning the screen off during an active game session permanently skipped `exit_game_mode`, leaving all performance overrides applied indefinitely
 - Added a full C port of `cgo_engine`, using direct syscalls (`sched_setaffinity`, `setpriority`, `sched_setscheduler`, `ioprio_set`, system property API) instead of exec'ing external binaries wherever possible
-- Fixed a check-key/set-key mismatch in the C port's settings logic for `power_mode`/`POWER_PERFORMANCE_MODE_OPEN`
 - Fixed 7 settings in `service.sh` (`game_do_not_disturb`, `game_scene_more_fps`, `gamecube_background_call_state`, `gamecube_block_notification_on`, `gamecube_block_notification_state`, `gamecube_competition_mode_state`, `gamecube_competition_system_state`) that were missing the `settings put system` prefix and silently failing to apply
 - Fixed an argument-shift bug in `service.sh`'s background trim-memory loop when a target app wasn't running
 - Fixed `build_game_list()` only checking `pm list packages` as a fallback when `dumpsys game` returned nothing, instead of merging both sources — games without the `isGame` flag (e.g. spin-off titles) were silently excluded whenever any other game was already detected via `dumpsys game`
