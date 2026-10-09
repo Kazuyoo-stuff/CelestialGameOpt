@@ -1,0 +1,98 @@
+#!/system/bin/sh
+#
+# Ram-Compaction (RC) by Kazuyoo
+# Copyright (C) 2026 Kazuyoo
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+
+taskset -p ff $$ >/dev/null;renice -n 19 -p $$ >/dev/null;ionice -c 3 -p $$ >/dev/null
+
+COMMAND="$1"
+RC_PID_FILE="/data/local/tmp/rc_server.pid"
+
+get_screen_state() {
+    [ "$(getprop debug.tracing.screen_state)" = "2" ] && echo "on" || \
+        (dumpsys window displays | grep -q "mScreenOnFully=true" && echo "on" || echo "off")
+}
+
+get_ram_usage() {
+  usage_pct=$(awk '/MemTotal/ {t=$2} /MemFree/ {f=$2} /Buffers/ {b=$2} /^Cached/ {c=$2} /Shmem/ {s=$2} END {if(t>0) print int((t-f-b-c+s)*100/t); else print 0}' /proc/meminfo)
+}
+
+extract_pkg_token() {
+    echo "$1" | grep -o '[A-Za-z0-9_.]\{3,\}/[A-Za-z0-9_.$]\{1,\}' | head -n1 | cut -d'/' -f1
+}
+
+get_fg_pkg() {
+    local line pkg
+
+    line=$(dumpsys window 2>/dev/null | grep -m1 'mCurrentFocus=')
+    pkg=$(extract_pkg_token "$line")
+
+    if [ -z "$pkg" ]; then
+        line=$(dumpsys activity activities 2>/dev/null | grep -m1 -E 'mResumedActivity|topResumedActivity')
+        pkg=$(extract_pkg_token "$line")
+    fi
+
+    echo "$pkg"
+}
+
+get_bg_apps() {
+    local fg="$1"
+    local EXC="$fg|network|music|spotify|systemui|settings|launcher|Launcher|inputmethod|whats|neko|tele|axeron|ksu|weishu|apatch|webui"
+    { ps -A -o NAME; dumpsys activity processes | grep "PID #" | grep -vE "system/1000|phone/1001" | grep -oE "([a-z_]+(\.[a-z_][a-z0-9_]*)+)"; } | grep -E "^(com|org|app|id|cn)\.[a-z0-9_]+\.[a-z0-9_.]+" | grep -vE "$EXC" | sort -u
+}
+
+compact_bg_apps() {
+    local bg_apps="$1"
+    local fg="$2"
+    for pkg in $bg_apps; do
+        [ "$pkg" = "$fg" ] && continue
+        local pid
+        pid=$(pidof "$pkg" | awk '{print $1}')
+        [ -z "$pid" ] && continue
+        cmd activity compact full "$pid"
+        cmd activity send-trim-memory "$pid" COMPLETE
+    done
+}
+
+starting_server() {
+    while true; do
+        get_ram_usage
+        screen_state=$(get_screen_state)
+
+        if [ "$screen_state" = "on" ]; then
+            fg_pkg=$(get_fg_pkg)
+            bg_apps=$(get_bg_apps "$fg_pkg")
+
+            if [ "$usage_pct" -gt 85 ]; then
+                cmd activity memory-factor set CRITICAL
+                cmd activity compact system
+                cmd activity kill-all
+                WAIT="20"
+            elif [ "$usage_pct" -gt 75 ]; then
+                cmd activity memory-factor set MODERATE
+                compact_bg_apps "$bg_apps"
+                WAIT="30"
+            elif [ "$usage_pct" -gt 65 ]; then
+                cmd activity memory-factor set LOW
+                compact_bg_apps "$bg_apps"
+                WAIT="40"
+            else
+                cmd activity memory-factor set NORMAL
+                compact_bg_apps "$bg_apps"
+                WAIT="60"
+            fi
+        else
+            WAIT="60"
+        fi
+
+        sleep $WAIT
+    done
+}
+
+starting_server &

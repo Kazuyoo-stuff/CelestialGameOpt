@@ -1,0 +1,562 @@
+#!/system/bin/sh
+#
+# Celestial-Game-Opt by Kazuyoo
+# Copyright (C) 2026 Kazuyoo
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+taskset -p ff $$ >/dev/null
+renice -n 19 -p $$ >/dev/null
+ionice -c 3 -p $$ >/dev/null
+
+COMMAND="$1"
+VALUE="$2"
+GAMELIST_FILE="/data/local/tmp/gamelist.txt"
+RC_PID_FILE="/data/local/tmp/rc_server.pid"
+FPS_CACHE="/data/local/tmp/kazuyoo_fps_cache"
+VERSION="$(getprop ro.build.version.release)"
+
+if [ -f "$FPS_CACHE" ] && [ $(( $(date +%s) - $(stat -c %Y "$FPS_CACHE" 2>/dev/null || echo 0) )) -lt 3600 ]; then
+    fps=$(cat "$FPS_CACHE")
+else
+    fps=$(dumpsys display | grep -Eo 'fps=[^.]+' | cut -f2 -d= | sort -n | uniq | tail -n1 || echo "60")
+    [ -z "$fps" ] && fps=60
+    echo "$fps" > "$FPS_CACHE"
+fi
+
+get_game_list() {
+    [ -f "$GAMELIST_FILE" ] && grep -v '^#' "$GAMELIST_FILE" | grep -v '^[[:space:]]*$'
+}
+
+write_val() {
+    [ -w "$1" ] && echo "$2" > "$1" 2>/dev/null
+}
+
+case "$COMMAND" in
+
+    "downscale")
+        DS_VAL="$VALUE"
+        { [ -z "$DS_VAL" ] || [ "$DS_VAL" = "1.00" ] || [ "$DS_VAL" = "1" ]; } && DS_VAL="disable"
+        echo "$DS_VAL" > /data/local/tmp/kazuyoo_render_scale
+        if [ -f "$GAMELIST_FILE" ]; then
+            grep -v '^#' "$GAMELIST_FILE" | grep -v '^[[:space:]]*$' | while IFS= read -r pkg; do
+                [ -z "$pkg" ] && continue
+                cmd game reset "$pkg"
+                cmd device_config put game_overlay "$pkg" "mode=2,downscaleFactor=$DS_VAL,useAngle=true,fps=$fps,loadingBoost=1073741824" 2>/dev/null
+                [ "$VERSION" -gt 13 ] && cmd game mode performance "$pkg" 2>/dev/null
+                [ "$VERSION" = 13 ] && cmd game set --downscale "$DS_VAL" --fps "$fps" "$pkg" 2>/dev/null
+            done
+        fi
+        ;;
+
+    "ram_compact")
+        if [ "$VALUE" = "on" ]; then
+            if [ -f "$RC_PID_FILE" ]; then
+                OLD_PID=$(cat "$RC_PID_FILE")
+                if kill -0 "$OLD_PID" 2>/dev/null; then
+                    echo "[!] Priority service already running (PID: $OLD_PID)"
+                    exit 0
+                fi
+                rm -f "$RC_PID_FILE"
+            fi
+            echo "[+] Starting RC priority service..."
+            RC >/data/local/tmp/rc_server.log 2>&1 &
+            PID=$!
+            echo "$PID" > "$RC_PID_FILE"
+            echo "[+] RC priority service enabled (PID: $PID)"
+        else
+            echo "[-] Disabling RC priority service..."
+            if [ -f "$RC_PID_FILE" ]; then
+                kill -9 "$(cat "$RC_PID_FILE")" 2>/dev/null
+                rm -f "$RC_PID_FILE"
+            fi
+            echo "[-] RC service stopped"
+        fi
+        ;;
+        
+    "dis_sensor")
+        if [ "$VALUE" = "on" ]; then
+            # Disable sensor | cre: t.me/Droid_ch
+            for b in $(seq 4 14);do
+                service call sensor_privacy $b i32 1
+            done
+        else
+            # Enable sensor | cre: t.me/Droid_ch
+            for b in $(seq 4 14);do
+                service call sensor_privacy $b i32 0
+            done
+        fi
+        ;;
+        
+    "dev_conf")
+        if [ "$VALUE" = "on" ]; then
+            # for Android 14+
+            device_config override windowing_frontend com.android.window.flags.fifo_priority_for_major_ui_processes true
+            device_config override backstage_power com.android.server.am.batching_oom_adj true
+            device_config override backstage_power com.android.server.am.defer_outgoing_broadcasts true
+            device_config override art_performance com.android.art.flags.use_app_image_startup_cache true
+            device_config override window_surfaces com.android.window.flags.offload_color_extraction true
+            device_config override game android.os.adpf_obtainview_boost true
+            device_config override game android.os.adpf_measure_during_input_event_boost true
+            device_config override game android.os.adpf_fmq_eager_send true
+            device_config override game android.server.app.disable_game_mode_when_app_top false
+            device_config override display_manager com.android.server.display.feature.flags.enable_vsync_low_power_vote false
+            device_config override display_manager com.android.server.display.feature.flags.enable_vsync_low_light_vote false
+            device_config override display_manager com.android.server.display.feature.flags.idle_screen_refresh_rate_timeout false
+            device_config override display_manager com.android.server.display.feature.flags.ignore_app_preferred_refresh_rate_request false
+        else
+            device_config clear_override windowing_frontend com.android.window.flags.fifo_priority_for_major_ui_processes
+            device_config clear_override backstage_power com.android.server.am.batching_oom_adj
+            device_config clear_override backstage_power com.android.server.am.defer_outgoing_broadcasts
+            device_config clear_override art_performance com.android.art.flags.use_app_image_startup_cache
+            device_config clear_override window_surfaces com.android.window.flags.offload_color_extraction
+            device_config clear_override game android.os.adpf_obtainview_boost
+            device_config clear_override game android.os.adpf_measure_during_input_event_boost
+            device_config clear_override game android.os.adpf_fmq_eager_send
+            device_config clear_override game android.server.app.disable_game_mode_when_app_top
+            device_config clear_override display_manager com.android.server.display.feature.flags.enable_vsync_low_power_vote
+            device_config clear_override display_manager com.android.server.display.feature.flags.enable_vsync_low_light_vote
+            device_config clear_override display_manager com.android.server.display.feature.flags.idle_screen_refresh_rate_timeout
+            device_config clear_override display_manager com.android.server.display.feature.flags.ignore_app_preferred_refresh_rate_request
+        fi
+        ;;
+        
+    "clean_ram")
+        nice -n 19 ionice -c3 setsid sh -c '
+            EXC="webui|permission|network|music|spotify|systemui|settings|launcher|inputmethod|axeron|ksu|weishu|apatch|whats|neko|insta|tele"
+            {
+                ps -A -o NAME
+                dumpsys activity processes | grep "PID #" | grep -vE "system/1000|phone/1001" | grep -oE "([a-z_]+(\.[a-z_][a-z0-9_]*)+)"
+            } | grep -E "^(com|org|app|id|cn)\.[a-z0-9_]+\.[a-z0-9_.]+" \
+              | grep -vE "$EXC" \
+              | sort -u \
+              | while read -r app; do
+                for p in /proc/[0-9]*; do
+                    cmdline=$(cat "$p/cmdline" 2>/dev/null | tr "\0" " ")
+                    case "$cmdline" in
+                        *"$app"*)
+                            pid=$(basename "$p")
+                            break
+                            ;;
+                    esac
+                done
+                [ -n "$pid" ] && {
+                    cmd activity compact full "$pid" >/dev/null 2>&1
+                    cmd activity send-trim-memory "$pid" COMPLETE >/dev/null 2>&1
+                    am force-stop "$app" >/dev/null 2>&1
+                }
+                pid=""
+            done
+        ' >/dev/null 2>&1 &
+        ;;
+
+    "dns_private")
+        VALUE="$(cat /data/local/tmp/kazuyoo_dns_private 2>/dev/null)"
+        if [ "$VALUE" = "off" ]; then
+            settings put global private_dns_specifier ""
+            settings put global private_dns_mode off
+        else
+            HOSTNAME=$(echo "$VALUE" | tr '[:upper:]' '[:lower:]')
+            settings put global private_dns_mode hostname
+            settings put global private_dns_specifier "$HOSTNAME"
+        fi
+        ;;
+
+    "renderer")
+        VALUE="$(cat /data/local/tmp/kazuyoo_renderer 2>/dev/null)"
+        P=$(echo "$VALUE" | tr '[:upper:]' '[:lower:]')
+        if [ "$VALUE" = "off" ] || [ -z "$VALUE" ]; then
+            setprop debug.hwui.renderer ""
+            setprop debug.renderengine.backend ""
+        else
+            setprop debug.hwui.renderer "$P"
+            setprop debug.renderengine.backend "${P}threaded"
+        fi
+        [ -f "$GAMELIST_FILE" ] && grep -v '^#' "$GAMELIST_FILE" | grep -v '^[[:space:]]*$' | while IFS= read -r pkg; do
+            [ -n "$pkg" ] && am force-stop "$pkg" 2>/dev/null
+        done
+        ;;
+
+    "composition")
+        VALUE="$(cat /data/local/tmp/kazuyoo_composition 2>/dev/null)"
+        P=$(echo "$VALUE" | tr '[:upper:]' '[:lower:]')
+        if [ "$VALUE" = "off" ]; then
+            setprop debug.composition.type ""
+        else
+            setprop debug.composition.type "$P"
+        fi
+        ;;
+
+    "refresh")
+        VALUE="$(cat /data/local/tmp/kazuyoo_refresh 2>/dev/null)"
+        case "$VALUE" in
+            "off")
+                getprop ro.tranos.version && settings put system tran_refresh_mode 10000
+                settings list secure | grep -q miui_refresh_rate && settings put secure miui_refresh_rate 60
+                settings list global | grep -q vivo_screen_refresh_rate_mode && settings put global vivo_screen_refresh_rate_mode 60
+                settings put secure user_refresh_rate 60
+                settings put system peak_refresh_rate 120
+                settings put system min_refresh_rate 60
+                ;;
+            "60Hz"|"90Hz"|"120Hz"|"144Hz")
+                VAL_HZ=$(echo "$VALUE" | sed 's/Hz//')
+                getprop ro.tranos.version && settings put system tran_refresh_mode "$VAL_HZ"
+                settings list secure | grep -q miui_refresh_rate && settings put secure miui_refresh_rate "$VAL_HZ"
+                settings list global | grep -q vivo_screen_refresh_rate_mode && settings put global vivo_screen_refresh_rate_mode "$VAL_HZ"
+                settings put secure user_refresh_rate "$VAL_HZ"
+                settings put system peak_refresh_rate "$VAL_HZ"
+                settings put system min_refresh_rate "$VAL_HZ"
+                ;;
+        esac
+        ;;
+
+    "driver")
+        VALUE="$(cat /data/local/tmp/kazuyoo_driver 2>/dev/null)"
+        VER=${VERSION:-12}
+        if [ "$VER" -ge 12 ]; then
+            KIN="updatable_driver_production_opt_in_apps"
+            KAN="updatable_driver_production_opt_out_apps"
+        else
+            KIN="game_driver_opt_in_apps"
+            KAN="game_driver_opt_out_apps"
+        fi
+        PKGS=$(get_game_list | tr '\n' ',' | sed 's/,$//')
+        case "$VALUE" in
+            "off")
+                settings delete global angle_gl_driver_selection_pkgs
+                settings delete global angle_gl_driver_selection_values
+                settings delete global "$KIN"
+                ;;
+            "AngleNative")
+                VALUES=$(echo "$PKGS" | sed 's/[^,][^,]*/native/g')
+                settings put global angle_gl_driver_selection_pkgs "$PKGS"
+                settings put global angle_gl_driver_selection_values "$VALUES"
+                settings delete global "$KIN"
+                settings delete global "$KAN"
+                ;;
+            "GameDriver")
+                settings delete global angle_gl_driver_selection_pkgs
+                settings delete global angle_gl_driver_selection_values
+                settings put global "$KIN" "$PKGS"
+                settings put global "$KAN" 1
+                ;;
+        esac
+        ;;
+
+    "clean_cache")
+        echo "Trimming partitions..."
+        nice -n 19 ionice -c3 setsid sh -c '
+            for partition in data cache metadata storage; do
+                if command -v su >/dev/null; then
+                    fstrim -v "/$partition"
+                else
+                    sm fstrim "/$partition"
+                fi
+            done
+        ' >/dev/null 2>&1 &
+        echo "Clearing app cache..."
+        nice -n 19 ionice -c3 setsid sh -c '
+            find /data/data/*/cache/* /data/data/*/code_cache/* \
+                 /data/user_de/*/*/cache/* /data/user_de/*/*/code_cache/* \
+                 /sdcard/Android/data/*/cache/* -delete 2>/dev/null
+        ' >/dev/null 2>&1 &
+        cmd package trim-caches 1024G
+        echo "Running system cleanup..."
+        nice -n 19 ionice -c3 setsid sh -c '
+            cmd blob_store clear-all-blobs
+            cmd blob_store clear-all-sessions
+            cmd font clear
+            cmd lock_settings remove-cache
+            cmd otadexopt cleanup
+            dumpsys media.metrics --clear
+            sm idle-maint run
+        ' >/dev/null 2>&1 &
+        sync
+        ;;
+
+    "network_adjuster")
+        NET="netpolicy_override_enabled netpolicy_quota_enabled netpolicy_quota_frac_jobs netpolicy_quota_frac_multipath netpolicy_quota_limited netpolicy_quota_unlimited netstats_augment_enabled netstats_combine_subtype_enabled netstats_dev_bucket_duration netstats_dev_delete_age netstats_dev_persist_bytes netstats_dev_rotate_age netstats_enabled netstats_global_alert_bytes netstats_poll_interval netstats_sample_enabled netstats_time_cache_max_age netstats_uid_bucket_duration netstats_uid_delete_age netstats_uid_persist_bytes netstats_uid_rotate_age netstats_uid_tag_bucket_duration netstats_uid_tag_delete_age netstats_uid_tag_persist_bytes netstats_uid_tag_rotate_age network_avoid_bad_wifi network_default_daily_multipath_quota_bytes network_location_opt_in network_metered_multipath_preference network_preference network_recommendations_enabled network_recommendations_package network_scorer_app network_scoring_provisioned network_scoring_ui_enabled network_switch_notification_daily_limit network_switch_notification_rate_limit_millis network_watchlist_enabled network_watchlist_last_report_time"
+        if [ "$VALUE" = "on" ]; then
+            nice -n 19 ionice -c3 setsid sh -c "for key in $NET; do settings put global \"\$key\" 0; done" >/dev/null 2>&1 &
+            settings list global | grep -q use_data_network_acclerate && settings put global use_data_network_acclerate 1
+        else
+            nice -n 19 ionice -c3 setsid sh -c "for key in $NET; do settings delete global \"\$key\"; done" >/dev/null 2>&1 &
+            settings list global | grep -q use_data_network_acclerate && settings put global use_data_network_acclerate null
+        fi
+        ;;
+
+    "disable_logging")
+        if [ "$VALUE" = "on" ]; then
+            echo "[+] Disabling system logging and tracing..."
+            nice -n 19 ionice -c3 setsid sh -c '
+                for a in $(echo "$property"|grep -F [log.tag|sed 's/\[/persist./g';echo "$property"|grep -F [persist.log.tag|sed 's/\[persist.//g';echo "$property"|grep log.tag|sed 's/\[//g');do
+                  setprop "$a" S
+                done
+                for b in 8 16 32 64 128 256 512 1024;do
+                  logcat -G "$b"m
+                done
+                for c in $(seq 1024);do
+                  logcat -c&
+                done
+                setprop log.tag S
+                setprop log.tag.stats_log S
+                setprop persist.traced.enable 0
+                setprop persist.traced_perf.enable 0
+                cmd stats clear-puller-cache
+                cmd stats print-logs 0
+                cmd blob_store idle-maintenance
+                cmd binder_calls_stats --disable
+                cmd binder_calls_stats --disable-detailed-tracking
+                cmd display ab-logging-disable
+                cmd display dwb-logging-disable
+                cmd display dmd-logging-disable
+                cmd looper_stats disable
+                cmd autofill set log_level off
+                cmd autofill set max_partitions 1
+                cmd autofill set max_visible_datasets 1
+                cmd autofill set full_screen_mode false
+                cmd statusbar tracing stop
+                simpleperf --log fatal --log-to-android-buffer 0
+                dumpsys procstats --clear
+                dumpsys procstats --stop-testing
+                cmd settings put global activity_starts_logging_enabled 0
+                cmd settings put global kernel_cpu_thread_reader num_buckets=0,minimum_total_cpu_usage_millis=999999999
+                cmd device_config put runtime_native_boot disable_lock_profiling true
+                cmd device_config put runtime_native_boot iorap_readahead_enable true
+                cmd device_config put interaction_jank_monitor enabled false
+                cmd device_config put interaction_jank_monitor debug_overlay_enabled false
+                atrace --async_stop
+                cmd activity clear-exit-info
+                cmd input_method tracing stop
+                cmd migard dump-trace false
+                cmd migard start-trace false
+                cmd migard stop-trace true
+                cmd migard trace-buffer-size 0
+                cmd window tracing size 0
+                cmd window tracing stop
+                cmd voiceinteraction set-debug-hotword-logging false
+                cmd wifi set-verbose-logging disabled -l 0
+                cmd window logging disable
+                cmd window logging stop
+                am log_switch reset
+            ' >/dev/null 2>&1 &
+            echo "[+] Logging disabled."
+        else
+            echo "[-] Resetting logging to default..."
+            nice -n 19 ionice -c3 setsid sh -c '
+                cmd binder_calls_stats --reset
+                cmd looper_stats reset
+                cmd settings delete global activity_starts_logging_enabled
+                cmd settings delete global kernel_cpu_thread_reader
+                cmd device_config delete runtime_native_boot disable_lock_profiling
+                cmd device_config delete runtime_native_boot iorap_readahead_enable
+                cmd device_config delete interaction_jank_monitor enabled
+                cmd device_config delete interaction_jank_monitor debug_overlay_enabled
+                cmd autofill reset
+                dumpsys procstats --reset
+            ' >/dev/null 2>&1 &
+            echo "[-] Logging reset."
+        fi
+        ;;
+
+    "gms_doze")
+    GMS_SCRIPT="/data/local/tmp/.kazuyoo_gms.sh"
+    if [ "$VALUE" = "on" ]; then
+        cat > "$GMS_SCRIPT" <<'EOF'
+cmd package list packages -a | awk -F: '/gms/ && !/revanced/ {print $2}' | xargs -n1 -P3 sh -c '
+    a="$1"
+    am force-stop "$a"
+    am kill-all "$a"
+    cmd activity set-inactive --user 0 "$a" true
+    cmd activity set-standby-bucket "$a" restricted
+    cmd activity service-restart-backoff disable "$a"
+    cmd activity set-bg-restriction-level --user 0 "$a" background_restricted
+    cmd activity set-foreground-service-delegate --user 0 "$a" stop
+    cmd activity clear-exit-info --user 0 all "$a"
+    dumpsys deviceidle whitelist -"$a"
+    cmd jobscheduler cancel -u 0 "$a"
+    cmd app_hibernation set-state "$a" true
+    cmd package compile --reset -f "$a"
+    cmd activity send-trim-memory "$(pidof $a)" COMPLETE
+    cmd activity freeze --sticky "$(pidof $a)"
+    cmd ufw settings freeze_one_process "$(pidof $a)"
+    cmd tare set-vip 0 "$a" false
+    cmd usagestats delete-package-data "$a"
+    cmd appops set "$a" FOREGROUND_SERVICE_SPECIAL_USE ignore
+    cmd appops set "$a" INSTANT_APP_START_FOREGROUND ignore
+    logcat -c
+' _
+for uid in $(pm list packages -U | grep "gms" | grep -v "revanced" | sed "s/.*uid://" | tr -d " "); do
+    cmd netpolicy add restrict-background-blacklist "$uid"
+done
+EOF
+    else
+        cat > "$GMS_SCRIPT" <<'EOF'
+cmd package list packages -a | awk -F: '/gms/ && !/revanced/ {print $2}' | xargs -n1 -P3 sh -c '
+    a="$1"
+    dumpsys deviceidle whitelist +"$a"
+    cmd activity set-inactive --user 0 "$a" false
+    cmd activity set-standby-bucket "$a" active
+    cmd activity set-bg-restriction-level --user 0 "$a" unrestricted
+    cmd activity set-foreground-service-delegate --user 0 "$a" start
+    cmd activity unfreeze --sticky "$(pidof $a)"
+    cmd activity compat reset-all "$a"
+    cmd app_hibernation set-state "$a" false
+    cmd tare set-vip 0 "$a" true
+    cmd jobscheduler cancel "$a"
+' _
+for uid in $(pm list packages -U | grep "gms" | grep -v "revanced" | sed "s/.*uid://" | tr -d " "); do
+    cmd netpolicy remove restrict-background-blacklist "$uid"
+done
+EOF
+    fi
+    nice -n 19 ionice -c3 setsid sh "$GMS_SCRIPT" >/dev/null 2>&1 &
+    ;;
+    
+    "dont_keep_activities")
+        if [ "$VALUE" = "on" ]; then
+            settings put global always_finish_activities 1
+        else
+            settings put global always_finish_activities 0
+        fi
+        ;;
+
+    "bg_limit")
+        VALUE="$(cat /data/local/tmp/kazuyoo_bg_limit 2>/dev/null)"
+        
+        t_code="$(cat /data/local/tmp/kazuyoo_t_code 2>/dev/null)"
+
+        case "$VALUE" in
+            "off"|""|"-1")
+                [ -n "$t_code" ] && service call activity "$t_code" i32 -1
+                ;;
+            "0"|"1"|"2"|"3"|"4")
+                [ -n "$t_code" ] && service call activity "$t_code" i32 "$VALUE"
+                ;;
+        esac
+        ;;
+
+    "check_reset_flag")
+        if [ -f /data/local/tmp/cgo_reset.flag ]; then
+            echo "1"
+            rm -f /data/local/tmp/cgo_reset.flag
+        else
+            echo "0"
+        fi
+        ;;
+
+    "saver")
+        if [ "$VALUE" = "on" ]; then
+            echo "[+] Mengaktifkan mode Saver (Battery Priority)..."
+            cmd power set-mode 1
+            settings put global low_power 1
+            settings put global low_power_sticky 1
+            settings list system | grep -q tran_settings_long_battery_mode && settings put system tran_settings_long_battery_mode 1
+            settings list system | grep -q POWER_SAVE_MODE_OPEN && settings put system POWER_SAVE_MODE_OPEN 1
+
+            cgo_engine --stop
+            DS_VAL="$(cat /data/local/tmp/kazuyoo_render_scale 2>/dev/null)"
+            [ -z "$DS_VAL" ] && DS_VAL="disable"
+            export GAMELIST_FILE DS_VAL
+
+            SAVER_ON_SCRIPT="/data/local/tmp/.kazuyoo_saver_on.sh"
+            cat > "$SAVER_ON_SCRIPT" <<'EOF'
+if [ -f "$GAMELIST_FILE" ]; then
+    grep -v '^[[:space:]]*#' "$GAMELIST_FILE" | grep -v '^[[:space:]]*$' | while IFS= read -r pkg || [ -n "$pkg" ]; do
+        [ -z "$pkg" ] && continue
+        cmd game reset "$pkg" >/dev/null 2>&1
+        cmd device_config put game_overlay "$pkg" "mode=1,downscaleFactor=$DS_VAL,useAngle=true,fps=60,loadingBoost=1073741824" >/dev/null 2>&1
+    done
+fi
+
+settings put global activity_manager_constants "max_cached_processes=4,background_settle_time=60000,gc_min_interval=120000,process_start_async=false,power_check_max_cpu_1=1,power_check_max_cpu_2=1,power_check_max_cpu_3=1,power_check_max_cpu_4=1,max_phantom_processes=4,low_swap_threshold_percent=0.10,proactive_kills_enabled=true,max_previous_time=15000,service_restart_duration=10000,binder_heavy_hitter_watcher_enabled=false"
+settings put global battery_saver_constants datasayer_disabled=false,disable_animation=true,vibration_disabled=true,disable_vibration=true,force_all_apps_standby=true,enable_quick_doze=true,animation_disabled=true,enable_datasayer=true,quick_doze_enabled=true,force_background_check=true
+settings put global job_scheduler_constants "min_latency=14400000,max_latency=172800000,max_batch_delay=28800000,background_settle_time=120000,conn_congestion_delay=1800000,conn_prefetch_relax=true,min_ready_non_active_jobs_count=20,max_cpu_only_job_batch_delay_ms=28800000,max_non_active_job_batch_delay_ms=28800000,standby_heartbeat=7200000,min_exp_backoff_time_ms=600000,system_stop_to_failure_ratio=1"
+settings put global job_scheduler_time_controller_constants "active=7200000,working=21600000,frequent=43200000,rare=86400000,never=172800000"
+settings put global job_scheduler_quota_controller_constants "max_job_count_active=3,max_job_count_working=2,max_job_count_frequent=1,max_job_count_rare=1,max_job_count_restricted=0,ej_limit_active_ms=15000,rate_limiting_window_ms=7200000,max_job_count_per_rate_limiting_window=3"
+
+sfdo force-client-composition disabled
+
+cmd display set-match-content-frame-rate-pref 0
+cmd activity memory-factor reset
+cmd display set-user-disabled-hdr-types
+cmd display set-match-content-frame-rate-pref 0
+cmd thermalservice reset
+cmd ufw settings set-preload-disable all false
+
+settings put global settings_enable_monitor_phantom_procs true
+settings put global fstrim_mandatory_interval 86400
+EOF
+            nice -n 19 ionice -c3 setsid sh "$SAVER_ON_SCRIPT" >/dev/null 2>&1 &
+            kazuyoo clean_ram
+        else
+            echo "[+] Nonaktifkan mode Saver."
+            cmd power set-mode 0
+            settings put global battery_saver_constants 0
+            settings put global low_power 0
+            settings put global low_power_sticky 0
+            settings list system | grep -q tran_settings_long_battery_mode && settings put system tran_settings_long_battery_mode 0
+            settings list system | grep -q POWER_SAVE_MODE_OPEN && settings put system POWER_SAVE_MODE_OPEN 0
+
+            SAVER_OFF_SCRIPT="/data/local/tmp/.kazuyoo_saver_off.sh"
+            cat > "$SAVER_OFF_SCRIPT" <<'EOF'
+settings put global activity_manager_constants "max_cached_processes=$SNAP_MCP,background_settle_time=30000,gc_min_interval=60000,process_start_async=true,power_check_max_cpu_1=5,power_check_max_cpu_2=3,power_check_max_cpu_3=1,power_check_max_cpu_4=1,max_phantom_processes=16,low_swap_threshold_percent=0.20,proactive_kills_enabled=true,max_previous_time=30000,service_restart_duration=5000,binder_heavy_hitter_watcher_enabled=false"
+settings put global job_scheduler_constants "min_latency=7200000,max_latency=86400000,max_batch_delay=14400000,background_settle_time=60000,conn_congestion_delay=900000,conn_prefetch_relax=false,min_ready_non_active_jobs_count=10,max_cpu_only_job_batch_delay_ms=14400000,max_non_active_job_batch_delay_ms=14400000,standby_heartbeat=1800000,min_exp_backoff_time_ms=120000,system_stop_to_failure_ratio=1"
+settings put global job_scheduler_time_controller_constants "active=3600000,working=10800000,frequent=21600000,rare=43200000,never=86400000"
+settings put global job_scheduler_quota_controller_constants "max_job_count_active=5,max_job_count_working=3,max_job_count_frequent=1,max_job_count_rare=1,max_job_count_restricted=0,ej_limit_active_ms=30000,rate_limiting_window_ms=3600000,max_job_count_per_rate_limiting_window=5"
+device_config override game android.os.adpf_prefer_power_efficiency false
+device_config override game android.os.adpf_hwui_gpu true
+device_config override game android.os.adpf_obtainview_boost true
+device_config override game android.os.adpf_measure_during_input_event_boost true
+device_config override game android.server.app.disable_game_mode_when_app_top false
+echo "0" > "/sys/kernel/tracing/tracing_on"
+echo "0" > "/sys/kernel/debug/tracing/tracing_on"
+sfdo force-client-composition enabled
+cmd display set-match-content-frame-rate-pref 1
+setprop debug.graphics.game_default_frame_rate.disabled 1
+cmd display set-user-disabled-hdr-types 1 2 3 4
+settings put global settings_enable_monitor_phantom_procs false
+settings put global fstrim_mandatory_interval 1
+cmd package list packages --user 0 | cut -f2 -d: | while read -r app; do
+   dumpsys game 2>/dev/null | grep -qF "$app" && cmd ufw settings set-preload-enable "$app" true
+done
+EOF
+            nice -n 19 ionice -c3 setsid sh "$SAVER_OFF_SCRIPT" >/dev/null 2>&1 &
+            cgo_engine --execute &
+            echo $! > /data/local/tmp/svc_server.pid
+        fi
+        ;;
+
+    *)
+        echo "Celestial-Game-Opt | kazuyoo v3.1"
+        echo ""
+        echo "Usage: kazuyoo <command> [value]"
+        echo ""
+        echo "Toggles (value: on|off):"
+        echo "  ram_compact   <on|off>  Toggle RAM compaction service"
+        echo "  dis_sensor    <on|off>  Toggle Reduce system load."
+        echo "  dev_conf    <on|off>  Opt Advance settings."
+        echo "  network_adjuster <on|off>  Toggle network statistics suppression"
+        echo "  disable_logging  <on|off>  Toggle system logging"
+        echo "  gms_doze      <on|off>  Toggle GMS doze mode"
+        echo ""
+        echo "Settings:"
+        echo "  refresh                 Apply refresh rate setting"
+        echo "  composition             Apply composition type setting"
+        echo "  driver                  Apply game driver setting"
+        echo "  dns_private             Apply private DNS setting"
+        echo ""
+        echo "Actions:"
+        echo "  saver                   Aktifkan mode ekstrem battery saver (Matikan perf daemon dll)"
+        echo "  clean_ram               Clean background apps & RAM"
+        echo "  clean_cache             Clean cache & trim partitions"
+        echo "  check_reset_flag        Check if settings reset is pending"
+        echo ""
+        exit 0
+        ;;
+esac
+
+exit 0
