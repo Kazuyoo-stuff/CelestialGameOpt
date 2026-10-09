@@ -1,3 +1,0 @@
-# Letakkan binary cgo_engine dan kazuyoo yang sudah dikompilasi di sini.
-# Binary tidak di-commit ke repo; build sendiri dari src/cgo_engine.c
-# atau unduh dari Releases.
