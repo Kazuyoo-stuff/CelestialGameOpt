@@ -1,0 +1,7 @@
+#!/system/bin/sh
+SKIPUNZIP=1
+. /data/adb/magisk/util_functions.sh 2>/dev/null \
+  || . /data/adb/ksu/bin/ksud 2>/dev/null \
+  || true
+extract "$ZIPFILE" 'customize.sh' "$TMPDIR"
+. "$TMPDIR/customize.sh"
